@@ -136,6 +136,7 @@
 - `AUDIT_WEBHOOK_SECRET=...`（建议必配）
 - `AUDIT_MAX_BODY_BYTES=2097152`
 - `AUDIT_MAX_SKEW_SECONDS=300`
+- `AUDIT_RETENTION_DAYS=30`（审计事件保留天数；设置为 `0` 可关闭自动清理）
 
 ### 监控/告警（建议）
 

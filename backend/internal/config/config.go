@@ -50,9 +50,10 @@ type Config struct {
 	LogLevel string `json:"log_level"`
 
 	// External audit webhook receiver (integrated)
-	AuditWebhookSecret   string `json:"audit_webhook_secret"`
-	AuditMaxBodyBytes    int64  `json:"audit_max_body_bytes"`
-	AuditMaxSkewSeconds  int64  `json:"audit_max_skew_seconds"`
+	AuditWebhookSecret  string `json:"audit_webhook_secret"`
+	AuditMaxBodyBytes   int64  `json:"audit_max_body_bytes"`
+	AuditMaxSkewSeconds int64  `json:"audit_max_skew_seconds"`
+	AuditRetentionDays  int64  `json:"audit_retention_days"`
 
 	// Data directory (for persistent local storage)
 	DataDir string `json:"data_dir"`
@@ -97,6 +98,7 @@ func Load() *Config {
 		AuditWebhookSecret:  getEnvStr("AUDIT_WEBHOOK_SECRET", ""),
 		AuditMaxBodyBytes:   int64(getEnvInt("AUDIT_MAX_BODY_BYTES", 2097152)),
 		AuditMaxSkewSeconds: int64(getEnvInt("AUDIT_MAX_SKEW_SECONDS", 300)),
+		AuditRetentionDays:  int64(getEnvInt("AUDIT_RETENTION_DAYS", 30)),
 
 		// Data
 		DataDir: getEnvStr("DATA_DIR", "./data"),

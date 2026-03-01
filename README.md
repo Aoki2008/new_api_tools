@@ -83,6 +83,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/Aoki2008/new_api_tools/main/i
 | `AUDIT_WEBHOOK_SECRET` | 审计 Webhook 验签密钥（可选，建议配置） | - |
 | `AUDIT_MAX_BODY_BYTES` | Webhook 最大接收大小（bytes） | `2097152` |
 | `AUDIT_MAX_SKEW_SECONDS` | 允许的时间戳偏移（秒） | `300` |
+| `AUDIT_RETENTION_DAYS` | 审计事件保留天数（<=0 关闭自动清理） | `30` |
 | **数据库配置** | | |
 | `DB_ENGINE` | 数据库类型 | `postgres` 或 `mysql` |
 | `DB_DNS` | 数据库地址 (Docker网络名或IP) | `new-api-db` |

@@ -25,6 +25,7 @@
 - `AUDIT_WEBHOOK_SECRET`：Webhook 验签密钥（建议设置；需与 new-api 的 `AuditWebhookSecret` 一致）
 - `AUDIT_MAX_BODY_BYTES`：Webhook payload 最大接收大小（默认 `2097152`）
 - `AUDIT_MAX_SKEW_SECONDS`：允许的时间戳偏移（默认 `300`）
+- `AUDIT_RETENTION_DAYS`：审计事件保留天数（默认 `30`；设置为 `0` 可关闭自动清理）
 
 启用后，可在 NewAPI-Tool 顶部导航进入 **日志审计** 查看事件列表与详情。
 

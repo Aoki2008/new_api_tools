@@ -7,10 +7,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/new-api-tools/backend/internal/cache"
 	"github.com/new-api-tools/backend/internal/config"
 	"github.com/new-api-tools/backend/internal/database"
 )
@@ -318,4 +320,124 @@ func ParseAuditEventPayload(rawBody []byte) (AuditEventPayload, error) {
 		return AuditEventPayload{}, err
 	}
 	return payload, nil
+}
+
+const auditRuntimeConfigHashKey = "app:config"
+const auditRetentionDaysRuntimeConfigKey = "audit_retention_days"
+
+func parseInt64ConfigValue(raw string) (int64, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, false
+	}
+
+	if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		return v, true
+	}
+
+	var decoded interface{}
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		return 0, false
+	}
+	switch t := decoded.(type) {
+	case float64:
+		return int64(t), true
+	case string:
+		v, err := strconv.ParseInt(strings.TrimSpace(t), 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return v, true
+	default:
+		return 0, false
+	}
+}
+
+// GetAuditRetentionDaysWithSource returns the effective retention days and its source.
+// Source is "runtime" when overridden via /api/audit/config, otherwise "env".
+func GetAuditRetentionDaysWithSource() (int64, string) {
+	cfg := config.Get()
+	days := cfg.AuditRetentionDays
+	source := "env"
+
+	cm := cache.Get()
+	raw, err := cm.HashGet(auditRuntimeConfigHashKey, auditRetentionDaysRuntimeConfigKey)
+	if err != nil {
+		return days, source
+	}
+	if v, ok := parseInt64ConfigValue(raw); ok {
+		days = v
+		source = "runtime"
+	}
+
+	return days, source
+}
+
+func GetAuditRetentionDays() int64 {
+	days, _ := GetAuditRetentionDaysWithSource()
+	return days
+}
+
+// CleanupExpiredAuditEvents deletes audit_events older than AUDIT_RETENTION_DAYS (based on received_at).
+// If AUDIT_RETENTION_DAYS <= 0, cleanup is disabled.
+func CleanupExpiredAuditEvents() (int64, error) {
+	days := GetAuditRetentionDays()
+	if days <= 0 {
+		return 0, nil
+	}
+
+	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
+	return DeleteAuditEventsBefore(cutoff, 5000, 200)
+}
+
+// DeleteAuditEventsBefore deletes audit events in batches to reduce long locks.
+// cutoffTs is unix seconds in received_at.
+func DeleteAuditEventsBefore(cutoffTs int64, batchSize int, maxBatches int) (int64, error) {
+	if cutoffTs <= 0 {
+		return 0, fmt.Errorf("invalid cutoffTs")
+	}
+
+	if err := ensureAuditSchema(); err != nil {
+		return 0, err
+	}
+	db := database.Get()
+
+	if batchSize <= 0 {
+		batchSize = 5000
+	}
+	if batchSize > 50000 {
+		batchSize = 50000
+	}
+	if maxBatches <= 0 {
+		maxBatches = 200
+	}
+	if maxBatches > 2000 {
+		maxBatches = 2000
+	}
+
+	var total int64
+	for i := 0; i < maxBatches; i++ {
+		var query string
+		if db.IsPG {
+			// PostgreSQL doesn't support DELETE ... LIMIT; delete by selecting ids.
+			query = `DELETE FROM audit_events WHERE id IN (
+  SELECT id FROM audit_events WHERE received_at < ? ORDER BY id LIMIT ?
+)`
+		} else {
+			query = `DELETE FROM audit_events WHERE received_at < ? LIMIT ?`
+		}
+
+		query = db.RebindQuery(query)
+		res, err := db.DB.Exec(query, cutoffTs, batchSize)
+		if err != nil {
+			return total, fmt.Errorf("delete audit events failed: %w", err)
+		}
+		affected, _ := res.RowsAffected()
+		total += affected
+		if affected < int64(batchSize) {
+			break
+		}
+	}
+
+	return total, nil
 }

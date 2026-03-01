@@ -57,6 +57,19 @@ interface AuditEventDetail {
   signature_valid: boolean
 }
 
+interface AuditConfig {
+  retention_days: number
+  retention_days_source?: string
+}
+
+interface AuditCleanupResult {
+  deleted: number
+  cutoff_received_at?: number
+  retention_days: number
+  retention_days_source?: string
+  message?: string
+}
+
 function formatTs(ts: number) {
   if (!ts) return '-'
   return new Date(ts * 1000).toLocaleString('zh-CN', {
@@ -87,6 +100,12 @@ export function Audit() {
   const { showToast } = useToast()
   const apiUrl = import.meta.env.VITE_API_URL || ''
 
+  const [retentionDays, setRetentionDays] = useState('')
+  const [retentionSource, setRetentionSource] = useState<string | null>(null)
+  const [configLoading, setConfigLoading] = useState(false)
+  const [configSaving, setConfigSaving] = useState(false)
+  const [cleanupRunning, setCleanupRunning] = useState(false)
+
   const [requestId, setRequestId] = useState('')
   const [path, setPath] = useState('')
   const [userId, setUserId] = useState('')
@@ -111,6 +130,81 @@ export function Audit() {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
   }), [token])
+
+  const fetchAuditConfig = useCallback(async () => {
+    setConfigLoading(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/audit/config`, { headers: getAuthHeaders() })
+      const json = await res.json()
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.message || json?.error?.message || '请求失败')
+      }
+      const data = json.data as AuditConfig
+      setRetentionDays(String(data?.retention_days ?? ''))
+      setRetentionSource(data?.retention_days_source || null)
+    } catch (e) {
+      console.error(e)
+      showToast('error', '加载审计配置失败')
+    } finally {
+      setConfigLoading(false)
+    }
+  }, [apiUrl, getAuthHeaders, showToast])
+
+  const saveAuditConfig = useCallback(async () => {
+    const days = Number(retentionDays)
+    if (!Number.isFinite(days) || !Number.isInteger(days) || days < 0 || days > 3650) {
+      showToast('error', '保留天数需为 0~3650 的整数')
+      return
+    }
+
+    setConfigSaving(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/audit/config`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ retention_days: days }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.message || json?.error?.message || '请求失败')
+      }
+      const data = json.data as AuditConfig
+      setRetentionDays(String(data?.retention_days ?? days))
+      setRetentionSource(data?.retention_days_source || 'runtime')
+      showToast('success', '已保存')
+    } catch (e) {
+      console.error(e)
+      showToast('error', '保存失败')
+    } finally {
+      setConfigSaving(false)
+    }
+  }, [apiUrl, getAuthHeaders, retentionDays, showToast])
+
+  const runAuditCleanup = useCallback(async () => {
+    setCleanupRunning(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/audit/cleanup`, { method: 'POST', headers: getAuthHeaders() })
+      const json = await res.json()
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.message || json?.error?.message || '请求失败')
+      }
+      const data = json.data as AuditCleanupResult
+      setRetentionDays(String(data?.retention_days ?? retentionDays))
+      setRetentionSource(data?.retention_days_source || retentionSource)
+
+      const deleted = Number(data?.deleted ?? 0)
+      if (deleted > 0) {
+        showToast('success', `已清理 ${deleted} 条`)
+      } else {
+        showToast('success', data?.message || '无可清理记录')
+      }
+    } catch (e) {
+      console.error(e)
+      showToast('error', '清理失败')
+    } finally {
+      setCleanupRunning(false)
+    }
+  }, [apiUrl, getAuthHeaders, retentionDays, retentionSource, showToast])
 
   const copyToClipboard = useCallback(async (text: string, label: string) => {
     try {
@@ -192,6 +286,7 @@ export function Audit() {
 
   useEffect(() => {
     fetchList('reset')
+    fetchAuditConfig()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const statusBadgeVariant = (code: number) => {
@@ -239,6 +334,59 @@ export function Audit() {
         </CardHeader>
 
         <CardContent className="space-y-4">
+          <div className="rounded-xl border border-border/50 p-3 bg-muted/10">
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">审计保留天数</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={retentionDays}
+                    onChange={(e) => setRetentionDays(e.target.value)}
+                    placeholder="例如 30"
+                    inputMode="numeric"
+                    className="h-9 w-[140px]"
+                    disabled={configLoading || configSaving || cleanupRunning}
+                  />
+                  {retentionSource ? (
+                    <Badge variant="outline" className="text-[11px]">
+                      source: {retentionSource}
+                    </Badge>
+                  ) : null}
+                </div>
+                <p className="text-[11px] text-muted-foreground">设置为 0 可关闭自动清理。</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={saveAuditConfig}
+                  disabled={configLoading || configSaving || cleanupRunning}
+                  className="h-9"
+                >
+                  {configSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  保存
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={runAuditCleanup}
+                  disabled={configLoading || configSaving || cleanupRunning}
+                  className="h-9"
+                >
+                  {cleanupRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  立即清理
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={fetchAuditConfig}
+                  disabled={configLoading || configSaving || cleanupRunning}
+                  className="h-9"
+                >
+                  {configLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                  刷新配置
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">request_id</label>

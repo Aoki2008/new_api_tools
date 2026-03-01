@@ -132,6 +132,10 @@ func main() {
 	stopIPEnforce := make(chan struct{})
 	go backgroundEnforceIPRecording(stopIPEnforce)
 
+	// Audit retention cleanup: delete expired audit events periodically (optional)
+	stopAuditCleanup := make(chan struct{})
+	go backgroundAuditCleanup(stopAuditCleanup)
+
 	// ========== 8. Start server with graceful shutdown ==========
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr(),
@@ -158,6 +162,7 @@ func main() {
 
 	// Stop background tasks
 	close(stopIPEnforce)
+	close(stopAuditCleanup)
 
 	// Give the server 10 seconds to finish processing requests
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -199,6 +204,54 @@ func backgroundEnforceIPRecording(stop <-chan struct{}) {
 		case <-stop:
 			logger.L.System("[IP记录] 强制开启定时任务已停止")
 			return
+		}
+	}
+}
+
+func backgroundAuditCleanup(stop <-chan struct{}) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.L.Error(fmt.Sprintf("[审计清理] 后台任务 panic: %v", r), logger.CatTask)
+		}
+	}()
+
+	logger.L.Task("审计日志自动清理后台任务已启动（默认每日一次，可在「日志审计」页面调整保留天数）")
+
+	runOnce := func() {
+		days, source := service.GetAuditRetentionDaysWithSource()
+		if days <= 0 {
+			return
+		}
+
+		cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
+		deleted, err := service.DeleteAuditEventsBefore(cutoff, 5000, 200)
+		if err != nil {
+			logger.L.TaskError("审计日志自动清理失败: " + err.Error())
+			return
+		}
+		if deleted > 0 {
+			logger.L.Task(fmt.Sprintf("审计日志自动清理完成: 删除 %d 条（保留 %d 天，source=%s）", deleted, days, source))
+		}
+	}
+
+	// Delay to avoid increasing startup DB load
+	timer := time.NewTimer(30 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-stop:
+		return
+	case <-timer.C:
+		runOnce()
+	}
+
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			runOnce()
 		}
 	}
 }
