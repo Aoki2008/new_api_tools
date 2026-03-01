@@ -29,6 +29,11 @@ func RequestLoggerMiddleware() gin.HandlerFunc {
 		statusCode := c.Writer.Status()
 		method := c.Request.Method
 
+		// Webhook endpoint can be very high volume; only log warnings/errors
+		if path == "/webhook/newapi" && statusCode < 400 {
+			return
+		}
+
 		// Log based on status code (matching Python's behavior)
 		switch {
 		case statusCode >= 500:

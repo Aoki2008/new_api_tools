@@ -5,7 +5,7 @@ set -euo pipefail
 # NewAPI Middleware Tool - 快速安装脚本
 #
 # 用法:
-#   bash <(curl -sSL https://raw.githubusercontent.com/james-6-23/new_api_tools/main/install.sh)
+#   bash <(curl -sSL https://raw.githubusercontent.com/Aoki2008/new_api_tools/main/install.sh)
 #
 # 功能:
 #   1. 自动检测 NewAPI 安装目录
@@ -27,7 +27,7 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 die() { log_error "$*"; exit 1; }
 
-REPO_URL="https://github.com/james-6-23/new_api_tools.git"
+REPO_URL="https://github.com/Aoki2008/new_api_tools.git"
 PROJECT_NAME="new_api_tools"
 REINSTALL=false
 
@@ -994,7 +994,7 @@ NewAPI Middleware Tool - 安装管理脚本
   PROJECT_DIR      指定项目目录（默认: 自动检测）
   NEWAPI_CONTAINER 指定 NewAPI 容器名（默认: 自动检测）
 
-更多信息: https://github.com/james-6-23/new_api_tools
+更多信息: https://github.com/Aoki2008/new_api_tools
 EOF
 }
 

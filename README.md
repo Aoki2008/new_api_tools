@@ -37,7 +37,7 @@
 如果您的 NewAPI 部署在 Linux 服务器上，可以使用一键脚本自动检测环境并部署。
 
 ```bash
-bash <(curl -sSL https://raw.githubusercontent.com/james-6-23/new_api_tools/main/install.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/Aoki2008/new_api_tools/main/install.sh)
 ```
 
 脚本功能：
@@ -52,7 +52,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/james-6-23/new_api_tools/main
 
 1. **下载项目**
    ```bash
-   git clone https://github.com/james-6-23/new_api_tools.git
+   git clone https://github.com/Aoki2008/new_api_tools.git
    cd new_api_tools
    ```
 
@@ -75,10 +75,14 @@ bash <(curl -sSL https://raw.githubusercontent.com/james-6-23/new_api_tools/main
 |--------|------|-------------|
 | **基础配置** | | |
 | `FRONTEND_PORT` | 服务访问端口 | `1145` |
-| `ADMIN_PASSWORD` | 管理后台登录密码 | `123456` |
+| `ADMIN_PASSWORD` | 管理后台登录密码 | **必填** |
 | `API_KEY` | 后端 API 密钥（可选） | - |
 | `JWT_SECRET` | JWT 签名密钥 | `random_string` |
 | `JWT_EXPIRE_HOURS` | JWT 过期时间（小时） | `24` |
+| **外部审计** | | |
+| `AUDIT_WEBHOOK_SECRET` | 审计 Webhook 验签密钥（可选，建议配置） | - |
+| `AUDIT_MAX_BODY_BYTES` | Webhook 最大接收大小（bytes） | `2097152` |
+| `AUDIT_MAX_SKEW_SECONDS` | 允许的时间戳偏移（秒） | `300` |
 | **数据库配置** | | |
 | `DB_ENGINE` | 数据库类型 | `postgres` 或 `mysql` |
 | `DB_DNS` | 数据库地址 (Docker网络名或IP) | `new-api-db` |
@@ -96,14 +100,12 @@ bash <(curl -sSL https://raw.githubusercontent.com/james-6-23/new_api_tools/main
 
 ## 🛠️ 本地开发
 
-### 后端 (Python/FastAPI)
+### 后端 (Go/Gin)
 
 ```bash
 cd backend
-# 推荐使用 uv 进行依赖管理
-uv sync
-# 启动开发服务器
-uv run uvicorn app.main:app --reload --port 8000
+# 设置必要环境变量（至少需要 SQL_DSN / ADMIN_PASSWORD）后启动
+go run ./cmd/server
 ```
 
 ### 前端 (React/Vite)
@@ -111,13 +113,11 @@ uv run uvicorn app.main:app --reload --port 8000
 ```bash
 cd frontend
 npm install
-# 启动开发服务器
+# 默认已启用预览模式（`frontend/.env.local` 里 `VITE_PREVIEW_MODE=1`），可不依赖后端查看 UI
 npm run dev
 ```
 
-## 🔗 API 文档
-
-后端启动后，可访问 `http://localhost:8000/docs` 查看完整的 Swagger API 文档。
+## 🔗 API
 
 主要端点：
 - `POST /api/auth/login`: 管理员登录
@@ -125,6 +125,8 @@ npm run dev
 - `GET /api/top-ups`: 充值记录查询
 - `POST /api/redemptions/generate`: 生成兑换码
 - `GET /api/redemptions/statistics`: 兑换码统计
+- `POST /webhook/newapi`: 外部审计 Webhook 接收（建议配置 `AUDIT_WEBHOOK_SECRET`）
+- `GET /api/events`: 审计事件列表（需要登录/JWT）
 
 ## 🤝 贡献与支持
 
@@ -136,4 +138,4 @@ MIT License
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=james-6-23/new_api_tools&type=Date)](https://star-history.com/#james-6-23/new_api_tools&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Aoki2008/new_api_tools&type=Date)](https://star-history.com/#Aoki2008/new_api_tools&Date)

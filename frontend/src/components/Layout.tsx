@@ -1,10 +1,11 @@
 import { ReactNode, useEffect, useState, useRef } from 'react'
-import { LayoutDashboard, Plus, Ticket, Clock, DollarSign, BarChart3, Users, LogOut, Activity, Globe, Monitor, UserPlus, Key } from 'lucide-react'
+import { LayoutDashboard, Plus, Ticket, Clock, DollarSign, BarChart3, Users, LogOut, Activity, Globe, Monitor, UserPlus, Key, ChevronDown, ShieldCheck } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu'
 import { cn } from '../lib/utils'
 
-export type TabType = 'dashboard' | 'risk' | 'ip-analysis' | 'generator' | 'redemptions' | 'history' | 'topups' | 'analytics' | 'model-status' | 'users' | 'auto-group' | 'tokens'
+export type TabType = 'dashboard' | 'risk' | 'ip-analysis' | 'generator' | 'redemptions' | 'history' | 'topups' | 'analytics' | 'audit' | 'model-status' | 'users' | 'auto-group' | 'tokens'
 
 interface DbStatus {
   connected: boolean
@@ -20,20 +21,48 @@ interface LayoutProps {
   onLogout: () => void
 }
 
-const tabs: { id: TabType; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'dashboard', label: '仪表板', icon: LayoutDashboard },
-  { id: 'topups', label: '充值记录', icon: DollarSign },
-  { id: 'risk', label: '风控中心', icon: Activity },
-  { id: 'ip-analysis', label: 'IP分析', icon: Globe },
-  { id: 'analytics', label: '日志分析', icon: BarChart3 },
-  { id: 'model-status', label: '模型监控', icon: Monitor },
-  { id: 'users', label: '用户管理', icon: Users },
-  { id: 'tokens', label: '令牌管理', icon: Key },
-  { id: 'auto-group', label: '自动分组', icon: UserPlus },
-  { id: 'generator', label: '生成器', icon: Plus },
-  { id: 'redemptions', label: '兑换码', icon: Ticket },
-  { id: 'history', label: '生成记录', icon: Clock },
+type NavItem =
+  | { type: 'tab'; id: TabType; label: string; icon: typeof LayoutDashboard }
+  | { type: 'dropdown'; key: string; label: string; icon: typeof LayoutDashboard; items: { id: TabType; label: string; icon: typeof LayoutDashboard }[] }
+
+const navItems: NavItem[] = [
+  { type: 'tab', id: 'dashboard', label: '仪表板', icon: LayoutDashboard },
+  { type: 'tab', id: 'topups', label: '充值记录', icon: DollarSign },
+  { type: 'tab', id: 'risk', label: '风控中心', icon: Activity },
+  { type: 'tab', id: 'ip-analysis', label: 'IP分析', icon: Globe },
+  { type: 'tab', id: 'analytics', label: '日志分析', icon: BarChart3 },
+  { type: 'tab', id: 'audit', label: '日志审计', icon: ShieldCheck },
+  { type: 'tab', id: 'model-status', label: '模型监控', icon: Monitor },
+  {
+    type: 'dropdown',
+    key: 'user-group',
+    label: '用户',
+    icon: Users,
+    items: [
+      { id: 'users', label: '用户管理', icon: Users },
+      { id: 'tokens', label: '令牌管理', icon: Key },
+      { id: 'auto-group', label: '自动分组', icon: UserPlus },
+    ],
+  },
+  {
+    type: 'dropdown',
+    key: 'generator-group',
+    label: '生成',
+    icon: Plus,
+    items: [
+      { id: 'generator', label: '生成器', icon: Plus },
+      { id: 'redemptions', label: '兑换码', icon: Ticket },
+      { id: 'history', label: '生成记录', icon: Clock },
+    ],
+  },
 ]
+
+function getActiveNavIndex(activeTab: TabType) {
+  return navItems.findIndex((item) => {
+    if (item.type === 'tab') return item.id === activeTab
+    return item.items.some(sub => sub.id === activeTab)
+  })
+}
 
 export function Layout({ children, activeTab, onTabChange, onLogout }: LayoutProps) {
   const [dbStatus, setDbStatus] = useState<DbStatus | null>(null)
@@ -64,7 +93,7 @@ export function Layout({ children, activeTab, onTabChange, onLogout }: LayoutPro
   }, [])
 
   useEffect(() => {
-    const activeTabIndex = tabs.findIndex(tab => tab.id === activeTab)
+    const activeTabIndex = getActiveNavIndex(activeTab)
     const activeTabElement = tabsRef.current[activeTabIndex]
 
     if (activeTabElement) {
@@ -79,7 +108,7 @@ export function Layout({ children, activeTab, onTabChange, onLogout }: LayoutPro
   // Handle window resize to recalculate positions
   useEffect(() => {
     const handleResize = () => {
-      const activeTabIndex = tabs.findIndex(tab => tab.id === activeTab)
+      const activeTabIndex = getActiveNavIndex(activeTab)
       const activeTabElement = tabsRef.current[activeTabIndex]
       if (activeTabElement) {
         setIndicatorStyle({
@@ -146,22 +175,71 @@ export function Layout({ children, activeTab, onTabChange, onLogout }: LayoutPro
                 }}
               />
 
-              {tabs.map(({ id, label, icon: Icon }, index) => (
-                <button
-                  key={id}
-                  ref={el => { tabsRef.current[index] = el }}
-                  onClick={() => onTabChange(id)}
-                  className={cn(
-                    "relative h-8 flex items-center justify-center gap-1.5 px-2 sm:px-3 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap transition-colors duration-200 z-10 select-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 shrink-0",
-                    activeTab === id
-                      ? "text-foreground drop-shadow-sm"
-                      : "text-muted-foreground hover:text-foreground/80"
-                  )}
-                >
-                  <Icon className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 transition-transform duration-300 shrink-0", activeTab === id ? "scale-110 text-primary" : "scale-100")} />
-                  <span>{label}</span>
-                </button>
-              ))}
+              {navItems.map((item, index) => {
+                const isActive = item.type === 'tab'
+                  ? activeTab === item.id
+                  : item.items.some(sub => sub.id === activeTab)
+
+                if (item.type === 'tab') {
+                  const Icon = item.icon
+                  return (
+                    <button
+                      key={item.id}
+                      ref={el => { tabsRef.current[index] = el }}
+                      onClick={() => onTabChange(item.id)}
+                      className={cn(
+                        "relative h-8 flex items-center justify-center gap-1.5 px-2 sm:px-3 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap transition-colors duration-200 z-10 select-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 shrink-0",
+                        isActive
+                          ? "text-foreground drop-shadow-sm"
+                          : "text-muted-foreground hover:text-foreground/80"
+                      )}
+                    >
+                      <Icon className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 transition-transform duration-300 shrink-0", isActive ? "scale-110 text-primary" : "scale-100")} />
+                      <span>{item.label}</span>
+                    </button>
+                  )
+                }
+
+                const Icon = item.icon
+                return (
+                  <DropdownMenu key={item.key}>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        ref={el => { tabsRef.current[index] = el }}
+                        className={cn(
+                          "relative h-8 flex items-center justify-center gap-1.5 px-2 sm:px-3 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap transition-colors duration-200 z-10 select-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 shrink-0",
+                          isActive
+                            ? "text-foreground drop-shadow-sm"
+                            : "text-muted-foreground hover:text-foreground/80"
+                        )}
+                      >
+                        <Icon className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 transition-transform duration-300 shrink-0", isActive ? "scale-110 text-primary" : "scale-100")} />
+                        <span>{item.label}</span>
+                        <ChevronDown className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 transition-transform duration-200", isActive ? "text-primary" : "")} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-[180px]">
+                      {item.items.map((sub) => {
+                        const SubIcon = sub.icon
+                        const isSubActive = activeTab === sub.id
+                        return (
+                          <DropdownMenuItem
+                            key={sub.id}
+                            onSelect={() => onTabChange(sub.id)}
+                            className={cn(
+                              "flex items-center gap-2",
+                              isSubActive ? "bg-accent text-accent-foreground" : ""
+                            )}
+                          >
+                            <SubIcon className={cn("h-4 w-4 shrink-0", isSubActive ? "text-primary" : "text-muted-foreground")} />
+                            <span>{sub.label}</span>
+                          </DropdownMenuItem>
+                        )
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )
+              })}
             </nav>
           </div>
         </div>

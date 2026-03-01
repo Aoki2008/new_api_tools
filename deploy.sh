@@ -354,6 +354,11 @@ interactive_config() {
   # API Key 自动生成
   API_KEY="${API_KEY:-$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | xxd -p | tr -d '\n' | head -c 64)}"
 
+  # 外部审计 Webhook（可选）
+  AUDIT_WEBHOOK_SECRET="${AUDIT_WEBHOOK_SECRET:-}"
+  AUDIT_MAX_BODY_BYTES="${AUDIT_MAX_BODY_BYTES:-2097152}"
+  AUDIT_MAX_SKEW_SECONDS="${AUDIT_MAX_SKEW_SECONDS:-300}"
+
   # 前端端口默认 1145
   FRONTEND_PORT="${FRONTEND_PORT:-1145}"
 
@@ -403,6 +408,11 @@ LOG_LEVEL=info
 # JWT 配置
 JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | xxd -p | tr -d '\n' | head -c 64)
 JWT_EXPIRE_HOURS=24
+
+# 外部审计 Webhook（可选，接收 new-api 投递）
+AUDIT_WEBHOOK_SECRET=${AUDIT_WEBHOOK_SECRET}
+AUDIT_MAX_BODY_BYTES=${AUDIT_MAX_BODY_BYTES}
+AUDIT_MAX_SKEW_SECONDS=${AUDIT_MAX_SKEW_SECONDS}
 
 # Redis 配置
 REDIS_PASSWORD=
@@ -579,7 +589,10 @@ NewAPI Middleware Tool - 一键部署脚本
   NEWAPI_NETWORK     指定 Docker 网络名 (默认: 自动检测)
   ADMIN_PASSWORD     前端访问密码 (默认: 交互式输入)
   API_KEY            后端 API Key (默认: 交互式输入或自动生成)
-  FRONTEND_PORT      前端端口 (默认: 8080)
+  AUDIT_WEBHOOK_SECRET  审计 Webhook 验签密钥 (可选，建议配置)
+  AUDIT_MAX_BODY_BYTES  Webhook 最大接收大小 (默认: 2097152)
+  AUDIT_MAX_SKEW_SECONDS 允许的时间戳偏移 (默认: 300)
+  FRONTEND_PORT      前端端口 (默认: 1145)
 
 示例:
   # 基本部署

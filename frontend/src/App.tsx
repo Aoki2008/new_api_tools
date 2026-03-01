@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Login, Layout, TabType, Generator, History, TopUps, Dashboard, Redemptions, Analytics, UserManagement, RealtimeRanking, IPAnalysis, ModelStatusMonitor, AutoGroup, Tokens } from './components'
+import { Login, Layout, TabType, Generator, History, TopUps, Dashboard, Redemptions, Analytics, Audit, UserManagement, RealtimeRanking, IPAnalysis, ModelStatusMonitor, AutoGroup, Tokens } from './components'
 import { useAuth } from './contexts/AuthContext'
 import { WarmupScreen } from './components/WarmupScreen'
 
+const PREVIEW_ENABLED = import.meta.env.DEV && ['1', 'true', 'yes', 'on'].includes(String(import.meta.env.VITE_PREVIEW_MODE ?? '').toLowerCase())
+
 // Valid tabs
-const validTabs: TabType[] = ['dashboard', 'topups', 'risk', 'ip-analysis', 'analytics', 'model-status', 'users', 'tokens', 'auto-group', 'generator', 'redemptions', 'history']
+const validTabs: TabType[] = ['dashboard', 'topups', 'risk', 'ip-analysis', 'analytics', 'audit', 'model-status', 'users', 'tokens', 'auto-group', 'generator', 'redemptions', 'history']
 
 // Get initial tab from URL pathname (supports sub-routes like /risk/ip)
 const getInitialTab = (): TabType => {
@@ -31,12 +33,16 @@ const getInitialTab = (): TabType => {
 function App() {
   const { isAuthenticated, token, login, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab)
-  const [warmupState, setWarmupState] = useState<'checking' | 'warming' | 'ready'>('checking')
+  const [warmupState, setWarmupState] = useState<'checking' | 'warming' | 'ready'>(() => PREVIEW_ENABLED ? 'ready' : 'checking')
 
   const apiUrl = import.meta.env.VITE_API_URL || ''
 
   // 检查后端预热状态
   useEffect(() => {
+    if (PREVIEW_ENABLED) {
+      setWarmupState('ready')
+      return
+    }
     if (!isAuthenticated || !token) return
 
     const checkWarmupStatus = async () => {
@@ -143,6 +149,8 @@ function App() {
         return <IPAnalysis />
       case 'analytics':
         return <Analytics />
+      case 'audit':
+        return <Audit />
       case 'model-status':
         return <ModelStatusMonitor />
       case 'users':

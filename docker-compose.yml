@@ -10,7 +10,7 @@
 
 services:
   newapi-tools:
-    image: ghcr.io/james-6-23/new_api_tools:latest
+    image: ghcr.io/aoki2008/new_api_tools:latest
     container_name: newapi-tools
     ports:
       - "${FRONTEND_PORT:-1145}:80"
@@ -29,6 +29,10 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET}
       - JWT_EXPIRE_HOURS=${JWT_EXPIRE_HOURS:-24}
+      # 外部审计 Webhook (可选)
+      - AUDIT_WEBHOOK_SECRET=${AUDIT_WEBHOOK_SECRET:-}
+      - AUDIT_MAX_BODY_BYTES=${AUDIT_MAX_BODY_BYTES:-2097152}
+      - AUDIT_MAX_SKEW_SECONDS=${AUDIT_MAX_SKEW_SECONDS:-300}
       # Redis 缓存
       - REDIS_CONN_STRING=redis://:${REDIS_PASSWORD:-}@redis:6379/0
       # 服务配置

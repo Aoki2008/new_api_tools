@@ -50,6 +50,20 @@ func main() {
 		db.EnsureIndexes(true, 500*time.Millisecond)
 	}()
 
+	// Ensure audit schema (non-fatal)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.L.Error(fmt.Sprintf("审计表初始化 goroutine panic: %v", r))
+			}
+		}()
+		time.Sleep(2 * time.Second)
+		db := database.Get()
+		if err := db.EnsureAuditSchema(true); err != nil {
+			logger.L.Warn("审计表初始化失败（将不会影响其他功能）: "+err.Error(), logger.CatDatabase)
+		}
+	}()
+
 	// ========== 4. Initialize Redis cache ==========
 	if cfg.RedisConnString != "" {
 		_, err := cache.Init(cfg.RedisConnString)
@@ -74,6 +88,7 @@ func main() {
 
 	// Health check (no auth required)
 	handler.RegisterHealthRoutes(r)
+	handler.RegisterAuditWebhookRoutes(r)
 
 	// API group with authentication
 	api := r.Group("/api")
@@ -92,6 +107,7 @@ func main() {
 		handler.RegisterDashboardRoutes(api)
 		handler.RegisterUserManagementRoutes(api)
 		handler.RegisterLogAnalyticsRoutes(api)
+		handler.RegisterAuditRoutes(api)
 
 		// Phase 2.3: IP Monitoring, Risk Monitoring, Model Status
 		handler.RegisterIPMonitoringRoutes(api)

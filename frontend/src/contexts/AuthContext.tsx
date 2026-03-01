@@ -3,6 +3,13 @@ import { setGlobalLogout, clearGlobalLogout } from '../lib/api'
 
 const TOKEN_KEY = 'newapi_tools_token'
 const TOKEN_EXPIRY_KEY = 'newapi_tools_token_expiry'
+const PREVIEW_TOKEN = '__preview__'
+
+function isTruthyEnv(value: unknown) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value ?? '').toLowerCase())
+}
+
+const PREVIEW_ENABLED = import.meta.env.DEV && isTruthyEnv(import.meta.env.VITE_PREVIEW_MODE)
 
 interface AuthContextType {
   isAuthenticated: boolean
@@ -27,6 +34,9 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(() => {
+    if (PREVIEW_ENABLED) {
+      return PREVIEW_TOKEN
+    }
     const savedToken = localStorage.getItem(TOKEN_KEY)
     const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY)
 
@@ -42,10 +52,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return null
   })
 
-  const isAuthenticated = token !== null
+  const isAuthenticated = PREVIEW_ENABLED || token !== null
 
   // Check token expiry periodically
   useEffect(() => {
+    if (PREVIEW_ENABLED) return
     const checkExpiry = () => {
       const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY)
       if (expiry && Date.now() >= parseInt(expiry, 10)) {
@@ -61,6 +72,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = useCallback(async (password: string): Promise<boolean> => {
     try {
+      if (PREVIEW_ENABLED) {
+        setToken(PREVIEW_TOKEN)
+        return true
+      }
       const apiUrl = import.meta.env.VITE_API_URL || ''
       const response = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
@@ -98,6 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   const logout = useCallback(() => {
+    if (PREVIEW_ENABLED) return
     setToken(null)
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(TOKEN_EXPIRY_KEY)

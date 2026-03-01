@@ -101,3 +101,9 @@ test_cf_bypass_go/go.sum
 test_cf_bypass_go/main.go
 test_cf_bypass_go/test_cf.exe
 database_schema.sql
+
+# Tooling temp files (Windows/go fmt may leave these behind)
+backend/cmd/server/main.go.*
+backend/**/*.go.*
+.gomodcache/
+.gocache/
