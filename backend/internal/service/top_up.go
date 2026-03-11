@@ -207,10 +207,10 @@ func GetTopUpStatistics(startDate, endDate string) (*TopUpStatistics, error) {
 		COUNT(*) as total_count,
 		COALESCE(SUM(amount), 0) as total_amount,
 		COALESCE(SUM(money), 0) as total_money,
-		SUM(CASE WHEN LOWER(status) IN ('success', 'completed') OR status = '1' THEN 1 ELSE 0 END) as success_count,
+		COALESCE(SUM(CASE WHEN LOWER(status) IN ('success', 'completed') OR status = '1' THEN 1 ELSE 0 END), 0) as success_count,
 		COALESCE(SUM(CASE WHEN LOWER(status) IN ('success', 'completed') OR status = '1' THEN amount ELSE 0 END), 0) as success_amount,
 		COALESCE(SUM(CASE WHEN LOWER(status) IN ('success', 'completed') OR status = '1' THEN money ELSE 0 END), 0) as success_money,
-		SUM(CASE WHEN LOWER(status) IN ('failed', 'error') OR status = '-1' THEN 1 ELSE 0 END) as failed_count,
+		COALESCE(SUM(CASE WHEN LOWER(status) IN ('failed', 'error') OR status = '-1' THEN 1 ELSE 0 END), 0) as failed_count,
 		COALESCE(SUM(CASE WHEN LOWER(status) IN ('failed', 'error') OR status = '-1' THEN amount ELSE 0 END), 0) as failed_amount,
 		COALESCE(SUM(CASE WHEN LOWER(status) IN ('failed', 'error') OR status = '-1' THEN money ELSE 0 END), 0) as failed_money
 		FROM top_ups WHERE %s`, whereSQL)
@@ -255,6 +255,9 @@ func GetPaymentMethods() ([]string, error) {
 	err := db.DB.Select(&methods, "SELECT DISTINCT payment_method FROM top_ups WHERE payment_method IS NOT NULL AND payment_method != '' ORDER BY payment_method")
 	if err != nil {
 		return nil, err
+	}
+	if methods == nil {
+		methods = []string{}
 	}
 	return methods, nil
 }
